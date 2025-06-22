@@ -19,6 +19,7 @@ type Request struct {
 type Response struct {
 	MessageSize   int32
 	CorrelationID int32
+	ErrorCode     int16
 }
 
 func ParseRequest(conn net.Conn) (parsedRequest Request, err error) {
@@ -47,10 +48,13 @@ func ParseRequest(conn net.Conn) (parsedRequest Request, err error) {
 	return parsedRequest, nil
 }
 
-func (res Response) GetFinalMessage() []byte {
+func (res Response) GetFinalMessage(req Request) []byte {
 	var messageBuf bytes.Buffer
 	binary.Write(&messageBuf, binary.BigEndian, int32(res.MessageSize))
 	binary.Write(&messageBuf, binary.BigEndian, int32(res.CorrelationID))
+	if res.ErrorCode != 0 {
+		binary.Write(&messageBuf, binary.BigEndian, int16(res.ErrorCode))
+	}
 	return messageBuf.Bytes()
 }
 
@@ -66,6 +70,8 @@ func handleConnection(conn net.Conn) {
 	var response Response
 	response.CorrelationID = request.CorrelationID
 	response.MessageSize = 0
-
-	conn.Write(response.GetFinalMessage())
+	if request.RequestApiVersion < 0 || request.RequestApiVersion > 4 {
+		response.ErrorCode = 35
+	}
+	conn.Write(response.GetFinalMessage(request))
 }
