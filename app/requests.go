@@ -8,21 +8,7 @@ import (
 	"net"
 )
 
-type Request struct {
-	RequestApiKey     int16
-	RequestApiVersion int16
-	CorrelationID     int32
-	ClientID          *string
-	TagBuffer         []byte
-}
-
-type Response struct {
-	MessageSize   int32
-	CorrelationID int32
-	ErrorCode     int16
-}
-
-func ParseRequest(conn net.Conn) (parsedRequest Request, err error) {
+func parseRequest(conn net.Conn) (parsedRequest Request, err error) {
 	var messageSize int32
 	if err = binary.Read(conn, binary.BigEndian, &messageSize); err != nil {
 		return
@@ -48,20 +34,49 @@ func ParseRequest(conn net.Conn) (parsedRequest Request, err error) {
 	return parsedRequest, nil
 }
 
-func (res Response) GetFinalMessage(req Request) []byte {
-	var messageBuf bytes.Buffer
-	binary.Write(&messageBuf, binary.BigEndian, int32(res.MessageSize))
-	binary.Write(&messageBuf, binary.BigEndian, int32(res.CorrelationID))
-	if res.ErrorCode != 0 {
-		binary.Write(&messageBuf, binary.BigEndian, int16(res.ErrorCode))
+func (res Response) send(conn net.Conn) (err error) {
+	// Only the response body/ headers
+	var bodyBuf bytes.Buffer
+	err = binary.Write(&bodyBuf, binary.BigEndian, int32(res.CorrelationID))
+	if err != nil {
+		return fmt.Errorf("Error while writing correlation_id: %v", err)
 	}
-	return messageBuf.Bytes()
+
+	// Add body to final message
+	var messageBuf bytes.Buffer
+	binary.Write(&messageBuf, binary.BigEndian, int32(bodyBuf.Len()))
+	_, err = messageBuf.Write(bodyBuf.Bytes())
+	if err != nil {
+		return fmt.Errorf("Error while writing message: %v", err)
+	}
+
+	// Send message
+	_, err = conn.Write(messageBuf.Bytes())
+	if err != nil {
+		return fmt.Errorf("Error while writing sending message: %v", err)
+	}
+	return
+}
+
+func (res Response) sendInvalidVersionResponse(conn net.Conn) {
+	// Only the response body/ headers
+	var bodyBuf bytes.Buffer
+	binary.Write(&bodyBuf, binary.BigEndian, int32(res.CorrelationID))
+	binary.Write(&bodyBuf, binary.BigEndian, int16(UnsupportedVersionErrorCode))
+
+	// Add body to final message
+	var messageBuf bytes.Buffer
+	binary.Write(&messageBuf, binary.BigEndian, int32(messageBuf.Len()))
+	messageBuf.Write(bodyBuf.Bytes())
+
+	// Send message
+	conn.Write(messageBuf.Bytes())
 }
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	request, err := ParseRequest(conn)
+	request, err := parseRequest(conn)
 	if err != nil {
 		fmt.Printf("Error in parsing request: %+v\n", err)
 		return
@@ -69,9 +84,11 @@ func handleConnection(conn net.Conn) {
 
 	var response Response
 	response.CorrelationID = request.CorrelationID
-	response.MessageSize = 0
-	if request.RequestApiVersion < 0 || request.RequestApiVersion > 4 {
-		response.ErrorCode = 35
+
+	if !request.ValidApiVersion() {
+		response.sendInvalidVersionResponse(conn)
+		return
 	}
-	conn.Write(response.GetFinalMessage(request))
+
+	response.send(conn)
 }
