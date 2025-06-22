@@ -14,17 +14,16 @@ type Response struct {
 	FinalMessage  bytes.Buffer
 }
 
-type Request []byte
-
 func handleConnection(request net.Conn) {
 	defer request.Close()
-	var req Request
-	request.Read(req)
+
 	var response Response
 	response.CorrelationID = 7
 	response.MessageSize = 4
+
 	binary.Write(&response.FinalMessage, binary.BigEndian, int32(response.MessageSize))
 	binary.Write(&response.FinalMessage, binary.BigEndian, int32(response.CorrelationID))
+
 	request.Write(response.FinalMessage.Bytes())
 }
 
