@@ -18,8 +18,12 @@ type Response struct {
 	FinalMessage  bytes.Buffer
 }
 
+type Request []byte
+
 func handleConnection(request net.Conn) {
 	defer request.Close()
+	var req Request
+	request.Read(req)
 	var response Response
 	response.CorrelationID = 7
 	response.MessageSize = 4
