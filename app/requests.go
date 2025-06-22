@@ -9,7 +9,6 @@ import (
 )
 
 type Request struct {
-	MessageSize       int32
 	RequestApiKey     int16
 	RequestApiVersion int16
 	CorrelationID     int32
@@ -22,11 +21,17 @@ type Response struct {
 	CorrelationID int32
 }
 
-func ParseRequest(request net.Conn) (parsedRequest Request, err error) {
-	var reqReader io.Reader = request
-	if err = binary.Read(reqReader, binary.BigEndian, &parsedRequest.MessageSize); err != nil {
+func ParseRequest(conn net.Conn) (parsedRequest Request, err error) {
+	var messageSize int32
+	if err = binary.Read(conn, binary.BigEndian, &messageSize); err != nil {
 		return
 	}
+
+	messageData := make([]byte, messageSize)
+	if _, err = io.ReadFull(conn, messageData); err != nil {
+		return
+	}
+	reqReader := bytes.NewReader(messageData)
 
 	if err = binary.Read(reqReader, binary.BigEndian, &parsedRequest.RequestApiKey); err != nil {
 		return
