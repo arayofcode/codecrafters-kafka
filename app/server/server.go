@@ -75,6 +75,10 @@ func sendInvalidVersionResponse(conn net.Conn, res protocol.Response) {
 	conn.Write(messageBuf.Bytes())
 }
 
+// func SendResponse(correlationId protocol.CorrelationId) (err error) {
+	
+// }
+
 func HandleConnection(conn net.Conn) {
 	defer conn.Close()
 

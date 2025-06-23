@@ -2,25 +2,32 @@ package protocol
 
 import "io"
 
-const (
-	NoErrorCode                 int16 = 0
-	UnsupportedVersionErrorCode int16 = 35
+type (
+	CorrelationId     int32
+	RequestApiKey     int16
+	RequestApiVersion int16
+	ErrorCode         int16
 )
 
 const (
-	ProduceRequestKey      int16 = 0
-	FetchRequestKey        int16 = 1
-	MetadataRequestKey     int16 = 3
-	ApiVersionsRequestKey  int16 = 18
-	CreateTopicsRequestKey int16 = 19
+	NoErrorCode                 ErrorCode = 0
+	UnsupportedVersionErrorCode ErrorCode = 35
+)
+
+const (
+	ProduceRequestKey      RequestApiKey = 0
+	FetchRequestKey        RequestApiKey = 1
+	MetadataRequestKey     RequestApiKey = 3
+	ApiVersionsRequestKey  RequestApiKey = 18
+	CreateTopicsRequestKey RequestApiKey = 19
 )
 
 type ApiVersionRange struct {
-	MinVersion int16
-	MaxVersion int16
+	MinVersion RequestApiVersion
+	MaxVersion RequestApiVersion
 }
 
-var SupportedVersions = map[int16]ApiVersionRange{
+var SupportedVersions = map[RequestApiKey]ApiVersionRange{
 	MetadataRequestKey:    {MinVersion: 0, MaxVersion: 4},
 	ProduceRequestKey:     {MinVersion: 5, MaxVersion: 11},
 	FetchRequestKey:       {MinVersion: 0, MaxVersion: 3},
@@ -28,17 +35,17 @@ var SupportedVersions = map[int16]ApiVersionRange{
 }
 
 type Request struct {
-	RequestApiKey     int16
-	RequestApiVersion int16
-	CorrelationID     int32
+	RequestApiKey     RequestApiKey
+	RequestApiVersion RequestApiVersion
+	CorrelationID     CorrelationId
 	ClientID          *string
 	TagBuffer         []byte
 	RequestData       RequestData
 }
 
 type Response struct {
-	CorrelationID int32
-	ErrorCode     int16
+	CorrelationID CorrelationId
+	ErrorCode     ErrorCode
 }
 
 type RequestData interface {
