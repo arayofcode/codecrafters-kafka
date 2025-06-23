@@ -85,37 +85,38 @@ func NewServer() *Server {
 func (s *Server) HandleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	request, body, err := parseRequest(conn)
-	if err != nil {
-		fmt.Printf("error in parsing request: %+v\n", err)
-		return
-	}
+	for {
+		request, body, err := parseRequest(conn)
+		if err != nil && err != io.EOF {
+			fmt.Printf("error in parsing request: %+v\n", err)
+			break
+		}
 
-	if !request.ValidApiVersion() {
-		responseBody := &protocol.ErrorResponse{ErrorCode: protocol.UnsupportedVersionErrorCode}
-		sendResponse(conn, request.CorrelationID, responseBody)
-		return
-	}
+		if !request.ValidApiVersion() {
+			responseBody := &protocol.ErrorResponse{ErrorCode: protocol.UnsupportedVersionErrorCode}
+			sendResponse(conn, request.CorrelationID, responseBody)
+			continue
+		}
 
-	key := protocol.RouterKey{
-		ApiKey:     request.RequestApiKey,
-		ApiVersion: request.RequestApiVersion,
-	}
-	handlerFunction, found := s.handlers[key]
-	if !found {
-		fmt.Printf("no handler found for key: %+v\n", key)
-		return
-	}
+		key := protocol.RouterKey{
+			ApiKey:     request.RequestApiKey,
+			ApiVersion: request.RequestApiVersion,
+		}
+		handlerFunction, found := s.handlers[key]
+		if !found {
+			fmt.Printf("no handler found for key: %+v\n", key)
+			continue
+		}
 
-	responseData, err := handlerFunction(request, body)
-	if err != nil {
-		fmt.Printf("handler for key %+v returned an error: %v\n", key, err)
-		return
-	}
+		responseData, err := handlerFunction(request, body)
+		if err != nil {
+			fmt.Printf("handler for key %+v returned an error: %v\n", key, err)
+			continue
+		}
 
-	fmt.Println(request.CorrelationID)
-
-	if err := sendResponse(conn, request.CorrelationID, responseData); err != nil {
-		fmt.Printf("failed to send response: %v\n", err)
+		if err := sendResponse(conn, request.CorrelationID, responseData); err != nil {
+			fmt.Printf("failed to send response: %v\n", err)
+			break
+		}
 	}
 }
