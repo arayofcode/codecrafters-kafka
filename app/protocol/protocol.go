@@ -1,12 +1,18 @@
 package protocol
 
-import "io"
+import (
+	"encoding/binary"
+	"fmt"
+	"io"
+)
 
 type (
-	CorrelationId     int32
-	RequestApiKey     int16
-	RequestApiVersion int16
-	ErrorCode         int16
+	CorrelationId int32
+	ApiKey        int16
+	ApiVersion    int16
+	ErrorCode     int16
+	MessageSize   int32
+	ThrottleTime  int32
 )
 
 const (
@@ -15,19 +21,19 @@ const (
 )
 
 const (
-	ProduceRequestKey      RequestApiKey = 0
-	FetchRequestKey        RequestApiKey = 1
-	MetadataRequestKey     RequestApiKey = 3
-	ApiVersionsRequestKey  RequestApiKey = 18
-	CreateTopicsRequestKey RequestApiKey = 19
+	ProduceRequestKey      ApiKey = 0
+	FetchRequestKey        ApiKey = 1
+	MetadataRequestKey     ApiKey = 3
+	ApiVersionsRequestKey  ApiKey = 18
+	CreateTopicsRequestKey ApiKey = 19
 )
 
 type ApiVersionRange struct {
-	MinVersion RequestApiVersion
-	MaxVersion RequestApiVersion
+	MinVersion ApiVersion
+	MaxVersion ApiVersion
 }
 
-var SupportedVersions = map[RequestApiKey]ApiVersionRange{
+var SupportedVersions = map[ApiKey]ApiVersionRange{
 	MetadataRequestKey:    {MinVersion: 0, MaxVersion: 4},
 	ProduceRequestKey:     {MinVersion: 5, MaxVersion: 11},
 	FetchRequestKey:       {MinVersion: 0, MaxVersion: 3},
@@ -35,17 +41,21 @@ var SupportedVersions = map[RequestApiKey]ApiVersionRange{
 }
 
 type Request struct {
-	RequestApiKey     RequestApiKey
-	RequestApiVersion RequestApiVersion
+	RequestApiKey     ApiKey
+	RequestApiVersion ApiVersion
 	CorrelationID     CorrelationId
 	ClientID          *string
 	TagBuffer         []byte
 	RequestData       RequestData
 }
 
+type ErrorResponse struct {
+	ErrorCode ErrorCode
+}
+
 type Response struct {
 	CorrelationID CorrelationId
-	ErrorCode     ErrorCode
+	ErrorResponse
 }
 
 type RequestData interface {
@@ -53,8 +63,15 @@ type RequestData interface {
 }
 
 type ResponseData interface {
-	Encode(w io.Writer)
+	Encode(w io.Writer) error
 }
+
+type RouterKey struct {
+	ApiKey     ApiKey
+	ApiVersion ApiVersion
+}
+
+type HandlerFunc func(req *Request, body io.Reader) (ResponseData, error)
 
 func (req Request) ValidApiVersion() bool {
 	apiKey := req.RequestApiKey
@@ -64,4 +81,11 @@ func (req Request) ValidApiVersion() bool {
 		return true
 	}
 	return false
+}
+
+func (e *ErrorResponse) Encode(w io.Writer) error {
+	if err := binary.Write(w, binary.BigEndian, e.ErrorCode); err != nil {
+		return fmt.Errorf("failed to encode error code: %w", err)
+	}
+	return nil
 }
