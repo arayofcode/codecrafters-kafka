@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"bytes"
@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net"
+
+	"github.com/arayofcode/codecrafters-kafka/app/protocol"
 )
 
-func parseRequest(conn net.Conn) (parsedRequest Request, err error) {
+func parseRequest(conn net.Conn) (parsedRequest protocol.Request, err error) {
 	var messageSize int32
 	if err = binary.Read(conn, binary.BigEndian, &messageSize); err != nil {
 		return
@@ -34,7 +36,7 @@ func parseRequest(conn net.Conn) (parsedRequest Request, err error) {
 	return parsedRequest, nil
 }
 
-func (res Response) send(conn net.Conn) (err error) {
+func sendResponse(conn net.Conn, res protocol.Response) (err error) {
 	// Only the response body/ headers
 	var bodyBuf bytes.Buffer
 	err = binary.Write(&bodyBuf, binary.BigEndian, int32(res.CorrelationID))
@@ -58,11 +60,11 @@ func (res Response) send(conn net.Conn) (err error) {
 	return
 }
 
-func (res Response) sendInvalidVersionResponse(conn net.Conn) {
+func sendInvalidVersionResponse(conn net.Conn, res protocol.Response) {
 	// Only the response body/ headers
 	var bodyBuf bytes.Buffer
 	binary.Write(&bodyBuf, binary.BigEndian, int32(res.CorrelationID))
-	binary.Write(&bodyBuf, binary.BigEndian, int16(UnsupportedVersionErrorCode))
+	binary.Write(&bodyBuf, binary.BigEndian, int16(protocol.UnsupportedVersionErrorCode))
 
 	// Add body to final message
 	var messageBuf bytes.Buffer
@@ -73,7 +75,7 @@ func (res Response) sendInvalidVersionResponse(conn net.Conn) {
 	conn.Write(messageBuf.Bytes())
 }
 
-func handleConnection(conn net.Conn) {
+func HandleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	request, err := parseRequest(conn)
@@ -82,13 +84,13 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
-	var response Response
+	var response protocol.Response
 	response.CorrelationID = request.CorrelationID
 
 	if !request.ValidApiVersion() {
-		response.sendInvalidVersionResponse(conn)
+		sendInvalidVersionResponse(conn, response)
 		return
 	}
 
-	response.send(conn)
+	sendResponse(conn, response)
 }

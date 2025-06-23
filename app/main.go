@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+
+	"github.com/arayofcode/codecrafters-kafka/app/server"
 )
 
 func main() {
@@ -21,6 +23,6 @@ func main() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			continue
 		}
-		go handleConnection(conn)
+		go server.HandleConnection(conn)
 	}
 }

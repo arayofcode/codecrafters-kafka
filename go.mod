@@ -1,3 +1,3 @@
-module github.com/codecrafters-io/kafka-starter-go
+module github.com/arayofcode/codecrafters-kafka
 
 go 1.24.0

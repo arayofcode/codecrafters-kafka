@@ -1,4 +1,6 @@
-package main
+package protocol
+
+import "io"
 
 const (
 	NoErrorCode                 int16 = 0
@@ -31,9 +33,28 @@ type Request struct {
 	CorrelationID     int32
 	ClientID          *string
 	TagBuffer         []byte
+	RequestData       RequestData
 }
 
 type Response struct {
 	CorrelationID int32
 	ErrorCode     int16
+}
+
+type RequestData interface {
+	Parse()
+}
+
+type ResponseData interface {
+	Encode(w io.Writer)
+}
+
+func (req Request) ValidApiVersion() bool {
+	apiKey := req.RequestApiKey
+	version := req.RequestApiVersion
+	versionRange, supported := SupportedVersions[apiKey]
+	if supported && version >= versionRange.MinVersion && version <= versionRange.MaxVersion {
+		return true
+	}
+	return false
 }
