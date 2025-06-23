@@ -36,7 +36,7 @@ type ApiVersionRange struct {
 var SupportedVersions = map[ApiKey]ApiVersionRange{
 	MetadataRequestKey:    {MinVersion: 0, MaxVersion: 4},
 	ProduceRequestKey:     {MinVersion: 5, MaxVersion: 11},
-	FetchRequestKey:       {MinVersion: 0, MaxVersion: 3},
+	FetchRequestKey:       {MinVersion: 0, MaxVersion: 16},
 	ApiVersionsRequestKey: {MinVersion: 0, MaxVersion: 4},
 }
 
